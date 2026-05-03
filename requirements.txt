@@ -1,0 +1,60 @@
+# ============================================================
+# SE-RGCN (Mandala) — Python dependencies
+# Install ORDER matters: install PyTorch first (with the right CUDA build),
+# then PyTorch Geometric and its companion wheels, then everything else.
+# See README.md for the exact pip commands.
+# ============================================================
+
+# ----- Core scientific stack -----
+numpy>=1.24,<2.0
+pandas>=2.0
+scipy>=1.11
+scikit-learn>=1.3
+
+# ----- Deep learning (install via the special index — see README) -----
+# torch==2.2.2+cu121
+# torchvision==0.17.2+cu121
+# torchaudio==2.2.2+cu121
+
+# ----- PyTorch Geometric stack (install via PyG wheel index — see README) -----
+# torch_geometric==2.5.3
+# torch_scatter
+# torch_sparse
+# torch_cluster
+# torch_spline_conv
+
+# ----- Graph / network analysis -----
+networkx>=3.2
+
+# ----- Geospatial (CShapes 2.0 distance matrix) -----
+geopandas>=0.14
+shapely>=2.0
+pyproj>=3.6
+fiona>=1.9
+rtree>=1.1
+
+# ----- Experiment tracking & config -----
+wandb>=0.16
+hydra-core>=1.3
+omegaconf>=2.3
+
+# ----- Survival analysis (reviewer-recommended; optional event-time framing) -----
+lifelines>=0.27
+pycox>=0.2
+
+# ----- Evaluation / metrics utilities -----
+torchmetrics>=1.3
+
+# ----- Notebooks & visualization -----
+jupyterlab>=4.0
+ipywidgets>=8.0
+matplotlib>=3.8
+seaborn>=0.13
+tqdm>=4.66
+
+# ----- Dev / test -----
+pytest>=8.0
+pytest-cov>=4.1
+ruff>=0.4
+black>=24.0
+mypy>=1.8
