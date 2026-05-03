@@ -1,7 +1,7 @@
 {
   "manifest": {
-    "git_commit": "950956f07e850913e1eabbeded65d7f5ec729b6d",
-    "timestamp_utc": "2026-05-03T12:20:35.355877Z",
+    "git_commit": "015cc9b5003742a5496d81d931824fae667c6655-dirty",
+    "timestamp_utc": "2026-05-03T12:37:51.256036Z",
     "hostname": "LAPTOP-JD288B6V",
     "python": "3.10.20",
     "platform": "Windows-10-10.0.26200-SP0",
@@ -30,19 +30,27 @@
       "bootstrap": 300,
       "probe_permutations": 50,
       "seed": 0,
-      "config": null,
+      "baselines": [
+        "all"
+      ],
+      "configs": [
+        "as_published",
+        "identity_free",
+        "identity_only"
+      ],
       "device": "cuda",
       "out_dir": "E:\\se-rgcn-mandala\\docs\\results\\track_b"
     }
   },
+  "baseline": "sgcn",
   "config": "as_published",
-  "training_seconds": 93.6815083026886,
+  "training_seconds": 93.28973054885864,
   "val": {
     "n_dyad_years": 8169,
     "n_positives": 152,
     "base_rate": 0.018606928632635574,
     "pr_auc": {
-      "point": 0.24530858377161177,
+      "point": 0.24530851744530385,
       "lo95": 0.23067091665301198,
       "hi95": 0.2743441857334644
     },
@@ -56,16 +64,16 @@
       "lo95": 11.008067042606516,
       "hi95": 18.73948234072022
     },
-    "brier_positives": 0.409746411394002
+    "brier_positives": 0.4097461870657302
   },
   "test": {
     "n_dyad_years": 14983,
     "n_positives": 212,
     "base_rate": 0.014149369285189882,
     "pr_auc": {
-      "point": 0.36506024616846955,
+      "point": 0.3650602461684695,
       "lo95": 0.3188338918713514,
-      "hi95": 0.4379572830902851
+      "hi95": 0.43795728309028514
     },
     "recall_at_k": {
       "point": 0.42452830188679247,
@@ -77,13 +85,13 @@
       "lo95": 19.61523191823899,
       "hi95": 29.203933384123278
     },
-    "brier_positives": 0.3049728128318472
+    "brier_positives": 0.30497262166779204
   },
   "identity_probe": {
     "baseline_pr_auc": 0.36506024616846955,
-    "permuted_pr_auc_mean": 0.3038510238701847,
-    "permuted_pr_auc_std": 0.014368003235929624,
-    "collapse_ratio": 0.16766882436724637,
+    "permuted_pr_auc_mean": 0.30385126460718004,
+    "permuted_pr_auc_std": 0.014367936486140728,
+    "collapse_ratio": 0.16766816492268108,
     "n_permutations_valid": 50
   }
 }

@@ -1,7 +1,7 @@
 {
   "manifest": {
-    "git_commit": "950956f07e850913e1eabbeded65d7f5ec729b6d",
-    "timestamp_utc": "2026-05-03T12:20:35.355877Z",
+    "git_commit": "015cc9b5003742a5496d81d931824fae667c6655-dirty",
+    "timestamp_utc": "2026-05-03T12:37:51.256036Z",
     "hostname": "LAPTOP-JD288B6V",
     "python": "3.10.20",
     "platform": "Windows-10-10.0.26200-SP0",
@@ -30,20 +30,28 @@
       "bootstrap": 300,
       "probe_permutations": 50,
       "seed": 0,
-      "config": null,
+      "baselines": [
+        "all"
+      ],
+      "configs": [
+        "as_published",
+        "identity_free",
+        "identity_only"
+      ],
       "device": "cuda",
       "out_dir": "E:\\se-rgcn-mandala\\docs\\results\\track_b"
     }
   },
+  "baseline": "sgcn",
   "config": "identity_free",
-  "training_seconds": 90.03972053527832,
+  "training_seconds": 94.38823771476746,
   "val": {
     "n_dyad_years": 8169,
     "n_positives": 152,
     "base_rate": 0.018606928632635574,
     "pr_auc": {
       "point": 0.2266925921324891,
-      "lo95": 0.20784916817255208,
+      "lo95": 0.20784916817255206,
       "hi95": 0.2534891819808958
     },
     "recall_at_k": {
@@ -56,7 +64,7 @@
       "lo95": 10.042543859649122,
       "hi95": 18.03233206371191
     },
-    "brier_positives": 0.4442000569911266
+    "brier_positives": 0.4441999615933644
   },
   "test": {
     "n_dyad_years": 14983,
@@ -64,7 +72,7 @@
     "base_rate": 0.014149369285189882,
     "pr_auc": {
       "point": 0.36144856454937474,
-      "lo95": 0.32247706696816264,
+      "lo95": 0.3224770669681627,
       "hi95": 0.429674682718783
     },
     "recall_at_k": {
@@ -77,12 +85,12 @@
       "lo95": 19.770413202876888,
       "hi95": 27.813777746947835
     },
-    "brier_positives": 0.333147117385118
+    "brier_positives": 0.3331470364336814
   },
   "identity_probe": {
     "baseline_pr_auc": 0.36144856454937474,
     "permuted_pr_auc_mean": 0.3614485645493747,
-    "permuted_pr_auc_std": 6.030054506389723e-17,
+    "permuted_pr_auc_std": 6.888752704931532e-17,
     "collapse_ratio": 1.5357966990535625e-16,
     "n_permutations_valid": 50
   }
