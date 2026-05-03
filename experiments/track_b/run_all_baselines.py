@@ -302,7 +302,7 @@ def score_split(model, bundle, args, device, *, year_start, year_end,
         if len(rows) == 0:
             continue
         g = bundle["by_year"][graph_year]
-        tensors = make_dyad_tensors(rows, bundle["gw_to_node"], device)
+        tensors = make_dyad_tensors(rows, bundle["gw_to_node"], bundle["dyad_feature_cols"], device)
         perm = embed_perm_for_year.get(tgt) if embed_perm_for_year else None
         logits = model(
             g["per_node_features"].to(device),
