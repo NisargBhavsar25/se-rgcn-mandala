@@ -1,86 +1,126 @@
 {
   "config": {
     "distance_matrix": "E:\\se-rgcn-mandala\\data\\processed\\distance_matrix.parquet",
-    "alliance_source": "ATOP_5.1",
     "test_window": [
       2006,
       2014
     ],
-    "train_window": [
-      1950,
-      2000
-    ],
-    "val_window": [
-      2001,
-      2005
-    ],
     "n_bootstrap": 500,
-    "block_by_year": true
+    "block_by_year": true,
+    "prd_universe_size": 87206
   },
-  "formation": {
-    "n_dyad_years": 15011,
-    "n_positives": 96,
-    "base_rate": 0.006395310105922323,
-    "k_for_topk": 96,
-    "pr_auc": {
-      "point": 0.006395310105922323,
-      "lo95": 0.003591072644859747,
-      "hi95": 0.009147492258933401
+  "alliance_task": {
+    "config": {
+      "source": "ATOP_5.1",
+      "test_window": [
+        2006,
+        2014
+      ],
+      "n_dyad_years": 15011
     },
-    "recall_at_k": {
-      "point": 0.006395310105922323,
-      "lo95": 0.007193262515917254,
-      "hi95": 0.014436641097089205
+    "formation": {
+      "n_dyad_years": 15011,
+      "n_positives": 96,
+      "base_rate": 0.006395310105922323,
+      "k_for_topk": 96,
+      "pr_auc": {
+        "point": 0.006395310105922323,
+        "lo95": 0.003591072644859747,
+        "hi95": 0.009147492258933401
+      },
+      "recall_at_k": {
+        "point": 0.006395310105922323,
+        "lo95": 0.007193262515917254,
+        "hi95": 0.014436641097089205
+      },
+      "lift_at_k": {
+        "point": 1.0,
+        "lo95": 0.9999999999999998,
+        "hi95": 1.0000000000000002
+      },
+      "brier_positives": 1.0
     },
-    "lift_at_k": {
-      "point": 1.0,
-      "lo95": 0.9999999999999998,
-      "hi95": 1.0000000000000002
+    "dissolution": {
+      "n_dyad_years": 15011,
+      "n_positives": 6,
+      "base_rate": 0.0003997068816201452,
+      "k_for_topk": 6,
+      "pr_auc": {
+        "point": 0.0003997068816201452,
+        "lo95": 8.573388203017832e-05,
+        "hi95": 0.0007236762754794355
+      },
+      "recall_at_k": {
+        "point": 0.0003997068816201452,
+        "lo95": 0.0004493708807669263,
+        "hi95": 0.000899907922247256
+      },
+      "lift_at_k": {
+        "point": 1.0,
+        "lo95": 0.9999999999999998,
+        "hi95": 1.0000000000000002
+      },
+      "brier_positives": 1.0
     },
-    "brier_positives": 1.0
+    "any_transition": {
+      "n_dyad_years": 15011,
+      "n_positives": 102,
+      "base_rate": 0.006795016987542469,
+      "k_for_topk": 102,
+      "pr_auc": {
+        "point": 0.006795016987542469,
+        "lo95": 0.0036479384415794886,
+        "hi95": 0.009775186386935687
+      },
+      "recall_at_k": {
+        "point": 0.006795016987542468,
+        "lo95": 0.007642841423162083,
+        "hi95": 0.015338931165657281
+      },
+      "lift_at_k": {
+        "point": 0.9999999999999999,
+        "lo95": 0.9999999999999998,
+        "hi95": 1.0000000000000002
+      },
+      "brier_positives": 1.0
+    }
   },
-  "dissolution": {
-    "n_dyad_years": 15011,
-    "n_positives": 6,
-    "base_rate": 0.0003997068816201452,
-    "k_for_topk": 6,
-    "pr_auc": {
-      "point": 0.0003997068816201452,
-      "lo95": 8.573388203017832e-05,
-      "hi95": 0.0007236762754794355
+  "conflict_task": {
+    "config": {
+      "source": "COW_MID_5.0",
+      "hostility_threshold": 3,
+      "originators_only": true,
+      "test_window": [
+        2006,
+        2014
+      ],
+      "n_dyad_years_uncensored": 14983,
+      "n_dyad_years_censored": 90,
+      "n_onsets_total_all_years": 2673,
+      "n_onsets_in_test_window": 244,
+      "prd_retention": 0.8688524590163934
     },
-    "recall_at_k": {
-      "point": 0.0003997068816201452,
-      "lo95": 0.0004493708807669263,
-      "hi95": 0.000899907922247256
-    },
-    "lift_at_k": {
-      "point": 1.0,
-      "lo95": 0.9999999999999998,
-      "hi95": 1.0000000000000002
-    },
-    "brier_positives": 1.0
-  },
-  "any_transition": {
-    "n_dyad_years": 15011,
-    "n_positives": 102,
-    "base_rate": 0.006795016987542469,
-    "k_for_topk": 102,
-    "pr_auc": {
-      "point": 0.006795016987542469,
-      "lo95": 0.0036479384415794886,
-      "hi95": 0.009775186386935687
-    },
-    "recall_at_k": {
-      "point": 0.006795016987542468,
-      "lo95": 0.007642841423162083,
-      "hi95": 0.015338931165657281
-    },
-    "lift_at_k": {
-      "point": 0.9999999999999999,
-      "lo95": 0.9999999999999998,
-      "hi95": 1.0000000000000002
-    },
-    "brier_positives": 1.0
+    "onset": {
+      "n_dyad_years": 14983,
+      "n_positives": 212,
+      "base_rate": 0.014149369285189882,
+      "k_for_topk": 212,
+      "pr_auc": {
+        "point": 0.014149369285189882,
+        "lo95": 0.012755716004813478,
+        "hi95": 0.01544209302760974
+      },
+      "recall_at_k": {
+        "point": 0.014149369285189882,
+        "lo95": 0.01592069690597777,
+        "hi95": 0.031850961538461536
+      },
+      "lift_at_k": {
+        "point": 1.0,
+        "lo95": 0.9999999999999999,
+        "hi95": 1.0000000000000002
+      },
+      "brier_positives": 1.0
+    }
   }
 }

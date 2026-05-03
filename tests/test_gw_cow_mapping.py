@@ -39,3 +39,15 @@ def test_cow_to_gw_series_vectorized():
     year = pd.Series([1980, 1980, 1940, 2000, 2018])
     result = cow_to_gw_series(cow, year).tolist()
     assert result == [260, 200, 255, 365, 260]
+
+
+def test_unified_yemen_post_1990_translates_to_678():
+    """COW 679 (Unified Yemen) -> GW 678 (continues North Yemen code)."""
+    assert cow_to_gw(679, 1995) == 678
+    assert cow_to_gw(679, 2010) == 678
+
+
+def test_yemen_codes_pre_1990_unchanged():
+    """Pre-unification Yemen codes (678 North, 680 South) are identity."""
+    assert cow_to_gw(678, 1985) == 678  # YAR
+    assert cow_to_gw(680, 1985) == 680  # YPR
