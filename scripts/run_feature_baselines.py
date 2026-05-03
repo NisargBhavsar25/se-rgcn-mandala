@@ -35,8 +35,10 @@ from src.data.trade import load_cow_trade_edges  # noqa: E402
 from src.evaluation.metrics import (  # noqa: E402
     bootstrap_ci, brier_positives, lift_at_k, pr_auc, recall_at_k,
 )
+from src.data.loaders import load_atop_alliance_edges  # noqa: E402
 from src.models.feature_baselines import (  # noqa: E402
-    FeatureLR, build_feature_table, rivalry_only_score,
+    FEATURE_COLS, FEATURE_COLS_RICH,
+    FeatureLR, build_feature_table, build_feature_table_rich, rivalry_only_score,
 )
 from src.models.views_ensemble import ViEWSEnsemble  # noqa: E402
 
@@ -58,6 +60,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--bootstrap", type=int, default=500)
     p.add_argument("--out", type=Path,
                    default=PROJECT_ROOT / "docs" / "results" / "feature_baselines.json")
+    p.add_argument(
+        "--rich-features", action="store_true",
+        help="Use the 12-feature substrate (rivalry counts at 1y/3y/5y/10y, "
+             "trade growth, common rivals, common allies, capital distance) "
+             "instead of the default 5 features. Output goes to "
+             "feature_baselines_rich.json by default.",
+    )
     return p.parse_args()
 
 
@@ -102,14 +111,15 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     args = parse_args()
 
-    logger.info("Loading distance / PRD / MID / trade")
+    logger.info("Loading distance / PRD / MID / trade / atop")
     distance = pd.read_parquet(args.distance)
     distance = distance[
-        (distance.year >= args.train_start - 1) & (distance.year <= args.test_end)
+        (distance.year >= args.train_start - 2) & (distance.year <= args.test_end)
     ]
     prd = prd_dyads_all_years(distance)[["year", "gwcode_i", "gwcode_j"]]
     onsets = load_mid_onsets(hostility_threshold=args.hostility_threshold)
-    trade = load_cow_trade_edges(years=range(args.train_start - 1, args.test_end + 1))
+    trade = load_cow_trade_edges(years=range(args.train_start - 2, args.test_end + 1))
+    atop = load_atop_alliance_edges(years=range(args.train_start - 1, args.test_end + 1))
 
     logger.info("Building MID-onset labels over PRD universe")
     mid_table = build_mid_onset_edge_table(prd, onsets)
@@ -117,11 +127,24 @@ def main() -> None:
         ["year", "gwcode_i", "gwcode_j", "edge_present"]
     ].copy()
 
-    logger.info("Materializing %d candidate dyad-years with features", len(candidates))
-    feats = build_feature_table(
-        candidates, distance, trade, onsets,
-        rivalry_window=args.rivalry_window,
-    )
+    if args.rich_features:
+        logger.info("Materializing %d candidates with RICH features (12 cols)",
+                    len(candidates))
+        feats = build_feature_table_rich(
+            candidates, distance, trade, onsets, atop,
+        )
+        feature_cols = tuple(FEATURE_COLS_RICH)
+        # Auto-rename output unless user overrode --out
+        if args.out.name == "feature_baselines.json":
+            args.out = args.out.with_name("feature_baselines_rich.json")
+    else:
+        logger.info("Materializing %d candidates with default features (5 cols)",
+                    len(candidates))
+        feats = build_feature_table(
+            candidates, distance, trade, onsets,
+            rivalry_window=args.rivalry_window,
+        )
+        feature_cols = tuple(FEATURE_COLS)
 
     train = feats[(feats.year >= args.train_start) & (feats.year <= args.train_end)]
     val = feats[(feats.year >= args.val_start) & (feats.year <= args.val_end)]
@@ -133,8 +156,8 @@ def main() -> None:
                 len(test), int(test.edge_present.sum()))
 
     # --- (F) Hand-crafted feature LR ---
-    logger.info("Training feature LR")
-    lr = FeatureLR.fit(train)
+    logger.info("Training feature LR (n_features=%d)", len(feature_cols))
+    lr = FeatureLR.fit(train, feature_cols=feature_cols)
     coef = dict(zip(lr.feature_cols, lr.model.coef_[0].tolist()))
     intercept = float(lr.model.intercept_[0])
     logger.info("LR coefficients: %s ; intercept = %.4f", coef, intercept)
@@ -158,7 +181,7 @@ def main() -> None:
 
     # --- (V) ViEWS-style ensemble (gradient boosting + RF + LR averaged) ---
     logger.info("Training ViEWS-style ensemble (GBM + RF + LR)")
-    views = ViEWSEnsemble.fit(train, seed=0)
+    views = ViEWSEnsemble.fit(train, seed=0, feature_cols=feature_cols)
     val_views_score = views.predict_proba(val)
     test_views_score = views.predict_proba(test)
     val_views = report_metrics(val_y, val_views_score, val_yrs, args.bootstrap)

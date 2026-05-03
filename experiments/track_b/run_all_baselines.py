@@ -48,12 +48,13 @@ from src.evaluation.metrics import (  # noqa: E402
     bootstrap_ci, brier_positives, lift_at_k, pr_auc, recall_at_k,
 )
 from src.evaluation.negative_sampling import time_aware_negatives  # noqa: E402
-from src.models.feature_baselines import build_feature_table  # noqa: E402
+from src.models.feature_baselines import (  # noqa: E402
+    FEATURE_COLS, FEATURE_COLS_RICH,
+    build_feature_table, build_feature_table_rich,
+)
 from src.probes.identity_permutation import identity_permutation_probe  # noqa: E402
 
 logger = logging.getLogger(__name__)
-
-DYAD_FEATURE_COLS = ("log_d_km", "log_trade", "contiguous", "both_major", "rivalry_count")
 
 BASELINE_REGISTRY: dict[str, Type] = {
     "sgcn": SGCN,
@@ -104,6 +105,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--track-val", action="store_true",
                    help="Track val PR-AUC trajectory across epochs (saved to "
                         "JSON). Implied by --early-stop.")
+    p.add_argument("--rich-features", action="store_true",
+                   help="Use the 12-feature rich substrate (rivalry counts at "
+                        "1y/3y/5y/10y, trade growth, common rivals, common "
+                        "allies, capital distance) instead of the default 5 "
+                        "features. Same per-node features in either case.")
     return p.parse_args()
 
 
@@ -116,17 +122,25 @@ def build_data_bundle(args) -> dict:
     ]
     prd = prd_dyads_all_years(distance)[["year", "gwcode_i", "gwcode_j"]]
     onsets = load_mid_onsets(hostility_threshold=args.hostility_threshold)
-    trade = load_cow_trade_edges(years=range(args.train_start - 1, args.test_end + 1))
-    atop = load_atop_alliance_edges(years=range(args.train_start - 1, args.test_end + 1))
-    atop = atop[["year", "gwcode_i", "gwcode_j", "edge_present"]]
+    trade = load_cow_trade_edges(years=range(args.train_start - 2, args.test_end + 1))
+    atop_full = load_atop_alliance_edges(years=range(args.train_start - 1, args.test_end + 1))
+    atop = atop_full[["year", "gwcode_i", "gwcode_j", "edge_present"]]
 
     mid_table = build_mid_onset_edge_table(prd, onsets)
     candidates = mid_table[mid_table.censored == 0][
         ["year", "gwcode_i", "gwcode_j", "edge_present"]
     ].copy()
-    feats = build_feature_table(
-        candidates, distance, trade, onsets, rivalry_window=args.rivalry_window,
-    )
+    if args.rich_features:
+        logger.info("Building RICH 12-feature dyad table")
+        feats = build_feature_table_rich(
+            candidates, distance, trade, onsets, atop_full,
+        )
+        dyad_feature_cols = tuple(FEATURE_COLS_RICH)
+    else:
+        feats = build_feature_table(
+            candidates, distance, trade, onsets, rivalry_window=args.rivalry_window,
+        )
+        dyad_feature_cols = tuple(FEATURE_COLS)
 
     all_states = sorted(set(prd["gwcode_i"]).union(prd["gwcode_j"]))
     gw_to_node = {gw: i for i, gw in enumerate(all_states)}
@@ -159,16 +173,17 @@ def build_data_bundle(args) -> dict:
         "all_states": all_states,
         "gw_to_node": gw_to_node,
         "n_nodes": n_nodes,
+        "dyad_feature_cols": dyad_feature_cols,
     }
 
 
-def make_dyad_tensors(rows, gw_to_node, device):
+def make_dyad_tensors(rows, gw_to_node, dyad_feature_cols, device):
     src = torch.tensor([gw_to_node[int(c)] for c in rows["gwcode_i"]],
                        dtype=torch.long, device=device)
     dst = torch.tensor([gw_to_node[int(c)] for c in rows["gwcode_j"]],
                        dtype=torch.long, device=device)
     dyad_x = torch.tensor(
-        rows[list(DYAD_FEATURE_COLS)].to_numpy(dtype=np.float32), device=device,
+        rows[list(dyad_feature_cols)].to_numpy(dtype=np.float32), device=device,
     )
     return {"src": src, "dst": dst, "dyad_x": dyad_x}
 
@@ -220,7 +235,7 @@ def train(model, optim, bundle, args, device):
             if batch is None or len(batch) == 0:
                 continue
             g = bundle["by_year"][graph_year]
-            tensors = make_dyad_tensors(batch, bundle["gw_to_node"], device)
+            tensors = make_dyad_tensors(batch, bundle["gw_to_node"], bundle["dyad_feature_cols"], device)
             labels = torch.tensor(
                 batch["label"].to_numpy(dtype=np.float32), device=device,
             )
@@ -335,7 +350,8 @@ def report_metrics(y_true, y_score, years, n_bootstrap):
 def run_one_cell(baseline_name, baseline_cls, config, bundle, args, device, manifest):
     logger.info("=== %s / %s ===", baseline_name, config.value)
     model = baseline_cls(
-        n_nodes=bundle["n_nodes"], n_features=5, n_dyad_features=len(DYAD_FEATURE_COLS),
+        n_nodes=bundle["n_nodes"], n_features=5,
+        n_dyad_features=len(bundle["dyad_feature_cols"]),
         hidden_dim=args.hidden_dim, n_layers=args.n_layers, config=config, dropout=args.dropout,
     ).to(device)
     optim = torch.optim.AdamW(

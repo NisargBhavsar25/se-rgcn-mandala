@@ -37,8 +37,13 @@ class ViEWSEnsemble:
     feature_cols: tuple[str, ...] = tuple(FEATURE_COLS)
 
     @classmethod
-    def fit(cls, train_features: pd.DataFrame, *, seed: int = 0) -> "ViEWSEnsemble":
-        X = train_features[list(FEATURE_COLS)].to_numpy()
+    def fit(
+        cls, train_features: pd.DataFrame,
+        *,
+        seed: int = 0,
+        feature_cols: tuple[str, ...] = tuple(FEATURE_COLS),
+    ) -> "ViEWSEnsemble":
+        X = train_features[list(feature_cols)].to_numpy()
         y = train_features["edge_present"].to_numpy().astype(int)
 
         # HistGBM doesn't accept class_weight='balanced' in older sklearn; use
@@ -63,7 +68,7 @@ class ViEWSEnsemble:
         )
         lr.fit(X, y)
 
-        return cls(gbm=gbm, rf=rf, lr=lr)
+        return cls(gbm=gbm, rf=rf, lr=lr, feature_cols=feature_cols)
 
     def predict_proba(self, features: pd.DataFrame) -> np.ndarray:
         X = features[list(self.feature_cols)].to_numpy()

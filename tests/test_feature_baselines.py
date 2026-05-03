@@ -176,3 +176,123 @@ def test_rivalry_only_score_returns_count():
     feats = pd.DataFrame({"rivalry_count": [0, 2, 5, 1]})
     out = rivalry_only_score(feats)
     np.testing.assert_array_equal(out, [0.0, 2.0, 5.0, 1.0])
+
+
+# ---------- rich-features extension -----------------------------------------
+
+def test_rich_feature_table_has_all_12_columns():
+    from src.models.feature_baselines import (
+        FEATURE_COLS_RICH, build_feature_table_rich,
+    )
+    distance = pd.DataFrame({
+        "year":          [2010, 2010, 2010],
+        "gwcode_i":      [   2,    2,  100],
+        "gwcode_j":      [ 200,  365,  101],
+        "d_km":          [5500, 8000,    0],
+        "d_capital_km":  [5800, 8200,  300],
+    })
+    trade = pd.DataFrame({
+        "year":         [2008, 2008, 2008, 2009, 2009, 2009],
+        "gwcode_i":     [   2,    2,  100,    2,    2,  100],
+        "gwcode_j":     [ 200,  365,  101,  200,  365,  101],
+        "total_trade": [400.0, 40.0,  8.0, 500.0, 50.0, 10.0],
+    })
+    onsets = pd.DataFrame({
+        "dispnum":     [1, 2],
+        "onset_year":  [2007, 2008],
+        "end_year":    [2007, 2008],
+        "gwcode_i":    [   2,  200],
+        "gwcode_j":    [ 200,  365],
+        "hostlev_max": [   4,    4],
+    })
+    atop = pd.DataFrame({
+        "year":         [2009, 2009],
+        "gwcode_i":     [   2,    2],
+        "gwcode_j":     [ 200,  100],
+        "edge_present": [   1,    1],
+    })
+    cand = _candidates()
+    feats = build_feature_table_rich(cand, distance, trade, onsets, atop)
+    for col in FEATURE_COLS_RICH:
+        assert col in feats.columns, f"missing column {col}"
+
+
+def test_rich_features_rivalry_at_multiple_windows():
+    from src.models.feature_baselines import build_feature_table_rich
+    distance = pd.DataFrame({
+        "year": [2010], "gwcode_i": [2], "gwcode_j": [200],
+        "d_km": [5500.0], "d_capital_km": [5800.0],
+    })
+    trade = pd.DataFrame({
+        "year": [2008, 2009], "gwcode_i": [2, 2], "gwcode_j": [200, 200],
+        "total_trade": [400.0, 500.0],
+    })
+    onsets = pd.DataFrame({
+        "dispnum":     [1, 2, 3, 4],
+        "onset_year":  [2009, 2007, 2005, 2001],  # 1y, 3y, 5y, 10y windows
+        "end_year":    [2009, 2007, 2005, 2001],
+        "gwcode_i":    [2, 2, 2, 2],
+        "gwcode_j":    [200, 200, 200, 200],
+        "hostlev_max": [4, 4, 4, 4],
+    })
+    atop = pd.DataFrame(columns=["year", "gwcode_i", "gwcode_j", "edge_present"])
+    cand = pd.DataFrame({
+        "year": [2010], "gwcode_i": [2], "gwcode_j": [200], "edge_present": [0],
+    })
+    feats = build_feature_table_rich(cand, distance, trade, onsets, atop)
+    # Window [2010-1, 2009] (1y) -> only the 2009 onset -> 1
+    assert int(feats.iloc[0].rivalry_count_1y) == 1
+    # Window [2007, 2009] (3y) -> 2007 + 2009 -> 2
+    assert int(feats.iloc[0].rivalry_count_3y) == 2
+    # Window [2005, 2009] (5y) -> 2005 + 2007 + 2009 -> 3
+    assert int(feats.iloc[0].rivalry_count) == 3
+    # Window [2000, 2009] (10y) -> 2001 + 2005 + 2007 + 2009 -> 4
+    assert int(feats.iloc[0].rivalry_count_10y) == 4
+
+
+def test_rich_features_common_rivals():
+    from src.models.feature_baselines import build_feature_table_rich
+    distance = pd.DataFrame({
+        "year": [2010], "gwcode_i": [2], "gwcode_j": [200],
+        "d_km": [5500.0], "d_capital_km": [5800.0],
+    })
+    trade = pd.DataFrame(columns=["year", "gwcode_i", "gwcode_j", "total_trade"])
+    # Both 2 and 200 fought 365 in last 5 years -> common_rivals = 1
+    onsets = pd.DataFrame({
+        "dispnum":     [1, 2],
+        "onset_year":  [2007, 2008],
+        "end_year":    [2007, 2008],
+        "gwcode_i":    [2, 200],
+        "gwcode_j":    [365, 365],
+        "hostlev_max": [4, 4],
+    })
+    atop = pd.DataFrame(columns=["year", "gwcode_i", "gwcode_j", "edge_present"])
+    cand = pd.DataFrame({
+        "year": [2010], "gwcode_i": [2], "gwcode_j": [200], "edge_present": [0],
+    })
+    feats = build_feature_table_rich(cand, distance, trade, onsets, atop)
+    assert int(feats.iloc[0].common_rivals_5y) == 1
+
+
+def test_rich_features_common_allies():
+    from src.models.feature_baselines import build_feature_table_rich
+    distance = pd.DataFrame({
+        "year": [2010], "gwcode_i": [2], "gwcode_j": [200],
+        "d_km": [5500.0], "d_capital_km": [5800.0],
+    })
+    trade = pd.DataFrame(columns=["year", "gwcode_i", "gwcode_j", "total_trade"])
+    onsets = pd.DataFrame(columns=[
+        "dispnum", "onset_year", "end_year", "gwcode_i", "gwcode_j", "hostlev_max",
+    ])
+    # Both 2 and 200 ally with 100 in 2009 (which is candidate-year - 1) -> common_allies = 1
+    atop = pd.DataFrame({
+        "year":         [2009, 2009],
+        "gwcode_i":     [   2,  100],
+        "gwcode_j":     [ 100,  200],
+        "edge_present": [   1,    1],
+    })
+    cand = pd.DataFrame({
+        "year": [2010], "gwcode_i": [2], "gwcode_j": [200], "edge_present": [0],
+    })
+    feats = build_feature_table_rich(cand, distance, trade, onsets, atop)
+    assert int(feats.iloc[0].common_allies) == 1
