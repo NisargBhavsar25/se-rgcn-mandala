@@ -38,6 +38,7 @@ from src.evaluation.metrics import (  # noqa: E402
 from src.models.feature_baselines import (  # noqa: E402
     FeatureLR, build_feature_table, rivalry_only_score,
 )
+from src.models.views_ensemble import ViEWSEnsemble  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,21 @@ def main() -> None:
     val_riv = report_metrics(val_y, val_riv_score, val_yrs, args.bootstrap)
     test_riv = report_metrics(test_y, test_riv_score, test_yrs, args.bootstrap)
 
+    # --- (V) ViEWS-style ensemble (gradient boosting + RF + LR averaged) ---
+    logger.info("Training ViEWS-style ensemble (GBM + RF + LR)")
+    views = ViEWSEnsemble.fit(train, seed=0)
+    val_views_score = views.predict_proba(val)
+    test_views_score = views.predict_proba(test)
+    val_views = report_metrics(val_y, val_views_score, val_yrs, args.bootstrap)
+    test_views = report_metrics(test_y, test_views_score, test_yrs, args.bootstrap)
+    # Per-learner test PR-AUC for diagnostic
+    per_learner_test = {}
+    per_learner_scores = views.predict_proba_per_learner(test)
+    for name, scores in per_learner_scores.items():
+        per_learner_test[name] = report_metrics(
+            test_y, scores, test_yrs, args.bootstrap,
+        )
+
     persistence_floor = 0.01415
     identity_only_floor = 0.1567
 
@@ -166,6 +182,10 @@ def main() -> None:
         "lr_intercept": intercept,
         "F_feature_lr": {"val": val_lr, "test": test_lr},
         "H_rivalry_only": {"val": val_riv, "test": test_riv},
+        "V_views_ensemble": {
+            "val": val_views, "test": test_views,
+            "per_learner_test": per_learner_test,
+        },
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w") as f:
@@ -191,16 +211,29 @@ def main() -> None:
     print_metrics("H-RIV / VAL", val_riv)
     print_metrics("H-RIV / TEST", test_riv)
 
+    print("\n>>> (V) ViEWS-style ensemble (GBM + RF + LR averaged)")
+    print_metrics("V-VIEWS / VAL", val_views)
+    print_metrics("V-VIEWS / TEST", test_views)
+    print("    Per-learner test PR-AUC (diagnostic):")
+    for name in ("gbm", "rf", "lr"):
+        v = per_learner_test[name]["pr_auc"]
+        print(f"      {name:6s} = {v['point']:.4f} [{v['lo95']:.4f}, {v['hi95']:.4f}]")
+
     print()
     print("=" * 76)
     print("Comparison vs. previously-locked floors (test PR-AUC):")
     print(f"  Persistence (no model)         : {persistence_floor:.4f}  (lift 1.00)")
     print(f"  Trade-only RGCN                : 0.1414  (lift 12.67)")
     print(f"  Identity-only RGCN ablation    : {identity_only_floor:.4f}  (lift 14.00)")
-    print(f"  (F) feature LR                 : {test_lr['pr_auc']['point']:.4f}  "
-          f"(lift {test_lr['lift_at_k']['point']:.2f})")
     print(f"  (H) rivalry-only               : {test_riv['pr_auc']['point']:.4f}  "
           f"(lift {test_riv['lift_at_k']['point']:.2f})")
+    print(f"  (F) feature LR                 : {test_lr['pr_auc']['point']:.4f}  "
+          f"(lift {test_lr['lift_at_k']['point']:.2f})")
+    print(f"  (V) ViEWS ensemble             : {test_views['pr_auc']['point']:.4f}  "
+          f"(lift {test_views['lift_at_k']['point']:.2f})")
+    print()
+    print("  Best identity-free GNN (SiGAT) : 0.3754  (lift 30.34)")
+    print("  Best as-published GNN (SDGNN)  : 0.3741  (lift 31.00)")
     print("=" * 76)
 
 

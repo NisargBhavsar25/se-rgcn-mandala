@@ -16,6 +16,7 @@ the three-config diagnostic.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import logging
 import sys
@@ -95,6 +96,14 @@ def parse_args() -> argparse.Namespace:
                    default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--out-dir", type=Path,
                    default=PROJECT_ROOT / "docs" / "results" / "track_b")
+    p.add_argument("--early-stop", action="store_true",
+                   help="Track val PR-AUC every epoch and restore best-val "
+                        "checkpoint at end of training. Off by default so "
+                        "default results are comparable to fixed-epoch Week 2 "
+                        "runs.")
+    p.add_argument("--track-val", action="store_true",
+                   help="Track val PR-AUC trajectory across epochs (saved to "
+                        "JSON). Implied by --early-stop.")
     return p.parse_args()
 
 
@@ -189,8 +198,15 @@ def make_year_batch(target_year, bundle, args, *, seed):
 
 
 def train(model, optim, bundle, args, device):
+    """Returns the val-PR-AUC trajectory (list of dicts) if tracking is on."""
     train_targets = list(range(args.train_start + 1, args.train_end + 1))
     rng = np.random.default_rng(args.seed)
+
+    track_val = args.track_val or args.early_stop
+    val_traj: list[dict] = []
+    best_val_pr = -float("inf")
+    best_state = None
+
     for epoch in range(args.epochs):
         order = train_targets.copy()
         rng.shuffle(order)
@@ -220,9 +236,38 @@ def train(model, optim, bundle, args, device):
             optim.step()
             epoch_loss += float(loss.detach())
             n_batches += 1
-        logger.info("[%s/%s] epoch %02d  avg_loss=%.4f",
-                    type(model).__name__, model.config.value, epoch,
-                    epoch_loss / max(n_batches, 1))
+        avg_loss = epoch_loss / max(n_batches, 1)
+
+        # Optional val-PR-AUC tracking. Cheap but not free; only run when asked.
+        val_pr_this_epoch = None
+        if track_val:
+            val_yt, val_ys, _ = score_split(
+                model, bundle, args, device,
+                year_start=args.val_start, year_end=args.val_end,
+            )
+            val_pr_this_epoch = float(pr_auc(val_yt, val_ys))
+            val_traj.append({
+                "epoch": epoch, "avg_train_loss": avg_loss,
+                "val_pr_auc": val_pr_this_epoch,
+            })
+            if args.early_stop and val_pr_this_epoch > best_val_pr:
+                best_val_pr = val_pr_this_epoch
+                best_state = copy.deepcopy(model.state_dict())
+
+        logger.info(
+            "[%s/%s] epoch %02d  avg_loss=%.4f  val_pr=%s",
+            type(model).__name__, model.config.value, epoch, avg_loss,
+            f"{val_pr_this_epoch:.4f}" if val_pr_this_epoch is not None else "n/a",
+        )
+
+    if args.early_stop and best_state is not None:
+        logger.info(
+            "[%s/%s] early-stop: restoring best-val checkpoint (val_pr=%.4f)",
+            type(model).__name__, model.config.value, best_val_pr,
+        )
+        model.load_state_dict(best_state)
+
+    return val_traj
 
 
 @torch.no_grad()
@@ -297,7 +342,7 @@ def run_one_cell(baseline_name, baseline_cls, config, bundle, args, device, mani
         model.parameters(), lr=args.lr, weight_decay=args.weight_decay
     )
     t0 = time.time()
-    train(model, optim, bundle, args, device)
+    val_traj = train(model, optim, bundle, args, device)
     elapsed = time.time() - t0
 
     val_yt, val_ys, val_yrs = score_split(
@@ -329,6 +374,8 @@ def run_one_cell(baseline_name, baseline_cls, config, bundle, args, device, mani
         "baseline": baseline_name, "config": config.value,
         "training_seconds": elapsed,
         "val": val_m, "test": test_m, "identity_probe": probe,
+        "val_trajectory": val_traj,  # empty list unless --track-val or --early-stop
+        "early_stop_used": bool(args.early_stop),
     }
 
 
