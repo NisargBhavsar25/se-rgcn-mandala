@@ -1,0 +1,102 @@
+{
+  "manifest": {
+    "git_commit": "c300b35852be8b4d9a9a413811df161001510740-dirty",
+    "timestamp_utc": "2026-05-03T14:15:55.649958Z",
+    "hostname": "LAPTOP-JD288B6V",
+    "python": "3.10.20",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "torch": "2.2.2+cu121",
+    "numpy": "1.26.4",
+    "pandas": "2.3.3",
+    "seed": 0,
+    "config": {
+      "distance": "E:\\se-rgcn-mandala\\data\\processed\\distance_matrix.parquet",
+      "train_start": 1950,
+      "train_end": 2000,
+      "val_start": 2001,
+      "val_end": 2005,
+      "test_start": 2006,
+      "test_end": 2014,
+      "hostility_threshold": 3,
+      "rivalry_window": 5,
+      "hidden_dim": 32,
+      "n_layers": 2,
+      "dropout": 0.2,
+      "lr": 0.001,
+      "weight_decay": 1e-05,
+      "epochs": 20,
+      "neg_per_pos": 10,
+      "year_window": 2,
+      "bootstrap": 300,
+      "probe_permutations": 50,
+      "seed": 0,
+      "baselines": [
+        "all"
+      ],
+      "configs": [
+        "as_published",
+        "identity_free",
+        "identity_only"
+      ],
+      "device": "cuda",
+      "out_dir": "docs\\results\\track_b_rich",
+      "early_stop": false,
+      "track_val": false,
+      "rich_features": true
+    }
+  },
+  "baseline": "sdgnn",
+  "config": "as_published",
+  "training_seconds": 141.63916611671448,
+  "val": {
+    "n_dyad_years": 8169,
+    "n_positives": 152,
+    "base_rate": 0.018606928632635574,
+    "pr_auc": {
+      "point": 0.24845838137592788,
+      "lo95": 0.22721439261470222,
+      "hi95": 0.29639451044918136
+    },
+    "recall_at_k": {
+      "point": 0.32894736842105265,
+      "lo95": 0.32894736842105265,
+      "hi95": 0.6229508196721312
+    },
+    "lift_at_k": {
+      "point": 17.678756925207757,
+      "lo95": 11.835855263157894,
+      "hi95": 17.678756925207757
+    },
+    "brier_positives": 0.43222333708897126
+  },
+  "test": {
+    "n_dyad_years": 14983,
+    "n_positives": 212,
+    "base_rate": 0.014149369285189882,
+    "pr_auc": {
+      "point": 0.3688839510264185,
+      "lo95": 0.32892229112198557,
+      "hi95": 0.4320953636943509
+    },
+    "recall_at_k": {
+      "point": 0.41037735849056606,
+      "lo95": 0.45304269695227145,
+      "hi95": 0.6921612466124659
+    },
+    "lift_at_k": {
+      "point": 29.003226237095053,
+      "lo95": 21.052367831122734,
+      "hi95": 28.276055705300987
+    },
+    "brier_positives": 0.31558008956201716
+  },
+  "identity_probe": {
+    "baseline_pr_auc": 0.3688839510264185,
+    "permuted_pr_auc_mean": 0.29015690257987087,
+    "permuted_pr_auc_std": 0.021183598302925898,
+    "collapse_ratio": 0.21341955438150637,
+    "n_permutations_valid": 50
+  },
+  "val_trajectory": [],
+  "early_stop_used": false
+}
