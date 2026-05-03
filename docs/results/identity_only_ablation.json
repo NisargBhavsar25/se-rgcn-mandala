@@ -1,0 +1,69 @@
+{
+  "config": {
+    "distance": "E:\\se-rgcn-mandala\\data\\processed\\distance_matrix.parquet",
+    "train_start": 1950,
+    "train_end": 2000,
+    "val_start": 2001,
+    "val_end": 2005,
+    "test_start": 2006,
+    "test_end": 2014,
+    "hostility_threshold": 3,
+    "hidden_dim": 64,
+    "n_layers": 2,
+    "dropout": 0.2,
+    "lr": 0.001,
+    "weight_decay": 1e-05,
+    "epochs": 30,
+    "neg_per_pos": 10,
+    "year_window": 2,
+    "bootstrap": 500,
+    "seed": 0,
+    "device": "cuda",
+    "out": "E:\\se-rgcn-mandala\\docs\\results\\identity_only_ablation.json",
+    "no_trade": true
+  },
+  "n_states_in_vocab": 209,
+  "training_seconds": 88.10396242141724,
+  "val": {
+    "n_dyad_years": 8169,
+    "n_positives": 152,
+    "base_rate": 0.018606928632635574,
+    "pr_auc": {
+      "point": 0.1563971801866062,
+      "lo95": 0.13873228281920996,
+      "hi95": 0.18400296686313874
+    },
+    "recall_at_k": {
+      "point": 0.23684210526315788,
+      "lo95": 0.23684210526315788,
+      "hi95": 0.45161290322580644
+    },
+    "lift_at_k": {
+      "point": 12.728704986149584,
+      "lo95": 7.0362381363244175,
+      "hi95": 12.728704986149584
+    },
+    "brier_positives": 0.5666239707321368
+  },
+  "test": {
+    "n_dyad_years": 14983,
+    "n_positives": 212,
+    "base_rate": 0.014149369285189882,
+    "pr_auc": {
+      "point": 0.15674586228389303,
+      "lo95": 0.13705653236006762,
+      "hi95": 0.1849020859609633
+    },
+    "recall_at_k": {
+      "point": 0.19811320754716982,
+      "lo95": 0.20855614973262032,
+      "hi95": 0.3723819340329835
+    },
+    "lift_at_k": {
+      "point": 14.001557493770026,
+      "lo95": 10.348223868608148,
+      "hi95": 14.693814794401149
+    },
+    "brier_positives": 0.5425922644954055
+  }
+}

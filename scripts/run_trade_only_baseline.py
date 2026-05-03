@@ -70,6 +70,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     p.add_argument("--out", type=Path,
                    default=PROJECT_ROOT / "docs" / "results" / "trade_only_baseline.json")
+    p.add_argument(
+        "--no-trade", action="store_true",
+        help="ABLATION: drop ALL trade signal -- empty trade graph (no message "
+             "passing) AND zero raw trade at the MLP head. Tests whether the "
+             "trade-only result is dyad-identity memorization or genuine trade "
+             "signal. If PR-AUC stays near the with-trade number, the model is "
+             "memorizing identities and 'trade-only' is misnamed.",
+    )
     return p.parse_args()
 
 
@@ -106,22 +114,27 @@ def build_full_data(args) -> dict:
         prd_y = prd[prd.year == y]
         states_y = sorted(set(prd_y.gwcode_i).union(prd_y.gwcode_j))
         trade_y = trade[trade.year == y]
-        graph_y = build_yearly_trade_graph(trade_y, states_y)
-        # Re-map local node IDs to GLOBAL vocab IDs so the same model works
-        # across years (since node embeddings are indexed by global ID).
-        global_src = torch.tensor(
-            [gw_to_node[graph_y.node_to_gwcode[int(s)]] for s in graph_y.edge_index[0].tolist()],
-            dtype=torch.long,
-        )
-        global_dst = torch.tensor(
-            [gw_to_node[graph_y.node_to_gwcode[int(d)]] for d in graph_y.edge_index[1].tolist()],
-            dtype=torch.long,
-        )
-        global_edge_index = torch.stack([global_src, global_dst])
+        if args.no_trade:
+            # Ablation: empty trade graph -> RGCN message passing is a no-op,
+            # node embeddings stay at their learned init across all layers.
+            global_edge_index = torch.empty(2, 0, dtype=torch.long)
+            edge_type_t = torch.empty(0, dtype=torch.long)
+        else:
+            graph_y = build_yearly_trade_graph(trade_y, states_y)
+            global_src = torch.tensor(
+                [gw_to_node[graph_y.node_to_gwcode[int(s)]] for s in graph_y.edge_index[0].tolist()],
+                dtype=torch.long,
+            )
+            global_dst = torch.tensor(
+                [gw_to_node[graph_y.node_to_gwcode[int(d)]] for d in graph_y.edge_index[1].tolist()],
+                dtype=torch.long,
+            )
+            global_edge_index = torch.stack([global_src, global_dst])
+            edge_type_t = graph_y.edge_type
 
         by_year[y] = {
             "edge_index": global_edge_index,
-            "edge_type": graph_y.edge_type,
+            "edge_type": edge_type_t,
             "trade_year": trade_y,
             "prd_pairs": prd_y,
         }
@@ -146,6 +159,7 @@ def make_year_batch(
     n_neg_per_pos: int,
     year_window: int,
     seed: int,
+    no_trade: bool = False,
 ) -> dict | None:
     """Build a (positives + sampled negatives) training batch for target_year."""
     label_table = bundle["label_table"]
@@ -198,15 +212,17 @@ def make_year_batch(
     batch = pd.DataFrame(rows)
 
     # Vectorized trade lookup: one bulk pass per unique graph-year.
+    # Under --no-trade ablation, skip lookup and feed zeros to the MLP head.
     batch_graph_years = batch["year"].to_numpy() - 1
     log_trade_per_row = np.zeros(len(batch), dtype=np.float32)
-    for graph_year in np.unique(batch_graph_years):
-        if int(graph_year) not in bundle["by_year"]:
-            continue
-        mask = batch_graph_years == graph_year
-        sub = batch.loc[mask, ["gwcode_i", "gwcode_j"]]
-        trade_y = bundle["by_year"][int(graph_year)]["trade_year"]
-        log_trade_per_row[mask] = lookup_dyad_trade(trade_y, sub)
+    if not no_trade:
+        for graph_year in np.unique(batch_graph_years):
+            if int(graph_year) not in bundle["by_year"]:
+                continue
+            mask = batch_graph_years == graph_year
+            sub = batch.loc[mask, ["gwcode_i", "gwcode_j"]]
+            trade_y = bundle["by_year"][int(graph_year)]["trade_year"]
+            log_trade_per_row[mask] = lookup_dyad_trade(trade_y, sub)
 
     src_idx = torch.tensor(
         [gw_to_node[c] for c in batch["gwcode_i"]], dtype=torch.long
@@ -239,6 +255,7 @@ def train(model, optim, bundle, args, device) -> None:
                 n_neg_per_pos=args.neg_per_pos,
                 year_window=args.year_window,
                 seed=args.seed + epoch * 1000 + tgt,
+                no_trade=args.no_trade,
             )
             if batch is None:
                 continue
@@ -269,7 +286,7 @@ def train(model, optim, bundle, args, device) -> None:
 @torch.no_grad()
 def evaluate(
     model, bundle, args, device,
-    *, year_start: int, year_end: int,
+    *, year_start: int, year_end: int, no_trade: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Score every uncensored PRD dyad in [year_start, year_end] (test years).
 
@@ -296,12 +313,15 @@ def evaluate(
         ]
         if len(candidates) == 0:
             continue
-        # Look up trade at the GRAPH year (tgt - 1)
-        trade_y = bundle["by_year"][graph_year]["trade_year"]
-        log_trade = lookup_dyad_trade(
-            trade_y,
-            candidates[["gwcode_i", "gwcode_j"]],
-        )
+        # Look up trade at the GRAPH year (tgt - 1); zeros under ablation.
+        if no_trade:
+            log_trade = np.zeros(len(candidates), dtype=np.float32)
+        else:
+            trade_y = bundle["by_year"][graph_year]["trade_year"]
+            log_trade = lookup_dyad_trade(
+                trade_y,
+                candidates[["gwcode_i", "gwcode_j"]],
+            )
         src_idx = torch.tensor(
             [gw_to_node[int(c)] for c in candidates["gwcode_i"]],
             dtype=torch.long, device=device,
@@ -361,6 +381,8 @@ def main() -> None:
     args = parse_args()
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+    if args.no_trade and args.out.name == "trade_only_baseline.json":
+        args.out = args.out.with_name("identity_only_ablation.json")
 
     bundle = build_full_data(args)
     n_nodes = len(bundle["all_states"])
@@ -386,6 +408,7 @@ def main() -> None:
     val_yt, val_ys, val_yrs = evaluate(
         model, bundle, args, device,
         year_start=args.val_start, year_end=args.val_end,
+        no_trade=args.no_trade,
     )
     val_metrics = report_metrics(val_yt, val_ys, val_yrs, args.bootstrap)
 
@@ -393,6 +416,7 @@ def main() -> None:
     test_yt, test_ys, test_yrs = evaluate(
         model, bundle, args, device,
         year_start=args.test_start, year_end=args.test_end,
+        no_trade=args.no_trade,
     )
     test_metrics = report_metrics(test_yt, test_ys, test_yrs, args.bootstrap)
 
@@ -414,7 +438,8 @@ def main() -> None:
 
     print()
     print("=" * 76)
-    print("Trade-only RGCN baseline -- Conflict onset (hostlev>=", args.hostility_threshold, ")")
+    label = "ABLATION: identity-only (no trade)" if args.no_trade else "Trade-only RGCN baseline"
+    print(f"{label} -- Conflict onset (hostlev>= {args.hostility_threshold})")
     print(f"  vocab = {n_nodes} states; train {args.train_start}-{args.train_end};")
     print(f"  val {args.val_start}-{args.val_end}; test {args.test_start}-{args.test_end}")
     print(f"  trained in {train_secs:.1f}s on {args.device}")
